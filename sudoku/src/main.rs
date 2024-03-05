@@ -4,8 +4,16 @@ macro_rules! min_idx {
     ($vc: ident) => {
         $vc.iter()
             .enumerate()
-            .min_by_key(|(_i, &value)| value)
+            .min_by_key(|(_i, &val)| if val == 0 { 10 } else { val })
             .map(|(idx, _value)| idx)
+            .unwrap()
+    };
+}
+
+macro_rules! min {
+    ($vc: ident) => {
+        $vc.iter()
+            .min_by_key(|&val| if *val == 0 { 10 } else { *val })
             .unwrap()
     };
 }
@@ -149,7 +157,6 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
     let mut v_empty = [0u8; 9];
     let mut s_empty = [0u8; 9];
     let mut memory = HashMap::new();
-    memory.insert(1, 1);
 
     for i in 0..board.len() {
         for j in 0..board[0].len() {
@@ -162,41 +169,54 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
     }
 
     while !all_zero!(h_empty) && !all_zero!(v_empty) && !all_zero!(s_empty) {
-        let h_fullness = h_empty.iter().min().unwrap();
-        let v_fullness = v_empty.iter().min().unwrap();
-        let s_fullness = s_empty.iter().min().unwrap();
+        // for _ in 0..5 {
+        let h_fullness = min!(h_empty);
+        let v_fullness = min!(v_empty);
+        let s_fullness = min!(s_empty);
 
-        let fullness = [h_fullness, v_fullness, s_fullness];
+        let fullness = [*h_fullness, *v_fullness, *s_fullness];
 
         let walker = match min_idx!(fullness) {
             0 => {
                 let idx = min_idx!(h_empty);
+                println!("Walk hor {}", idx);
                 Walker::Hor(WalkHor::new(idx))
             }
             1 => {
                 let idx = min_idx!(v_empty);
+                println!("Walk vert {}", idx);
                 Walker::Vert(WalkVert::new(idx))
             }
             2 => {
                 let idx = min_idx!(s_empty);
+                println!("Walk square {}", idx);
                 Walker::Square(WalkSquare::new(idx))
             }
             _ => unreachable!(),
         };
 
         for (i, j) in walker {
-            if board[i][j] == '.' {
-                let pretendents = get_possible_values(&board, i, j);
-                println!("{:?}", pretendents);
-                break;
+            if board[i][j] == '.' && !memory.contains_key(&(i, j)) {
+                let pretendents = get_pretendents(&board, i, j);
+
+                match pretendents.len() {
+                    1 => {
+                        let p = pretendents.into_iter().next().unwrap();
+                        board[i][j] = p;
+                        update_memory(p, i, j, board, &mut memory);
+                    }
+                    _ => {
+                        memory.insert((i, j), pretendents);
+                    }
+                };
+                update_empty(i, j, &mut h_empty, &mut v_empty, &mut s_empty);
             }
         }
-
-        break;
+        print_matrix(board);
     }
 }
 
-fn get_possible_values(board: &Vec<Vec<char>>, i: usize, j: usize) -> HashSet<char> {
+fn get_pretendents(board: &Vec<Vec<char>>, i: usize, j: usize) -> HashSet<char> {
     let mut pretendents: HashSet<char> = ('1'..='9').collect();
 
     for walker in [
@@ -220,6 +240,55 @@ fn reduce_pretendents(
     for (i, j) in walker {
         if (i_orig, j_orig) != (i, j) {
             pretendents.remove(&board[i][j]);
+        }
+    }
+}
+
+fn update_empty(
+    i: usize,
+    j: usize,
+    h_empty: &mut [u8; 9],
+    v_empty: &mut [u8; 9],
+    s_empty: &mut [u8; 9],
+) {
+    h_empty[i] -= 1;
+    v_empty[j] -= 1;
+    s_empty[(i / 3) * 3 + j / 3] -= 1;
+
+    println!("h: {:?} v: {:?}, s:{:?}", h_empty, v_empty, s_empty);
+}
+
+fn print_matrix(m: &Vec<Vec<char>>) {
+    for v in m.iter() {
+        println!("{:?}", v);
+    }
+}
+
+fn update_memory(
+    c: char,
+    i: usize,
+    j: usize,
+    board: &mut Vec<Vec<char>>,
+    memory: &mut HashMap<(usize, usize), HashSet<char>>,
+) {
+    println!("upd mem {} {} {}", c, i, j);
+    println!("memory {:?} ", memory);
+    for walker in [
+        Walker::Hor(WalkHor::from_ij(i, j)),
+        Walker::Vert(WalkVert::from_ij(i, j)),
+        Walker::Square(WalkSquare::from_ij(i, j)),
+    ] {
+        for (i, j) in walker {
+            if let Some(pretendents) = memory.get_mut(&(i, j)) {
+                pretendents.remove(&c);
+                println!("|| hey hey len: {}", pretendents.len());
+                if pretendents.len() == 0 {
+                    memory.remove(&(i, j));
+                    board[i][j] = c;
+                    println!("board after fix {}", board[i][j]);
+                    update_memory(c, i, j, board, memory);
+                }
+            }
         }
     }
 }
