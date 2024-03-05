@@ -168,6 +168,8 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
         }
     }
 
+    print_matrix(board);
+
     while !all_zero!(h_empty) && !all_zero!(v_empty) && !all_zero!(s_empty) {
         // for _ in 0..5 {
         let h_fullness = min!(h_empty);
@@ -202,10 +204,10 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
                 match pretendents.len() {
                     1 => {
                         let p = pretendents.into_iter().next().unwrap();
-                        board[i][j] = p;
-                        update_memory(p, i, j, board, &mut memory);
+                        update_board(p, i, j, board, &mut memory);
                     }
                     _ => {
+                        println!("Memory insert {:?}, into {} {}", pretendents, i, j);
                         memory.insert((i, j), pretendents);
                     }
                 };
@@ -213,6 +215,7 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
             }
         }
         print_matrix(board);
+        println!("{:?}", memory);
     }
 }
 
@@ -255,7 +258,10 @@ fn update_empty(
     v_empty[j] -= 1;
     s_empty[(i / 3) * 3 + j / 3] -= 1;
 
-    println!("h: {:?} v: {:?}, s:{:?}", h_empty, v_empty, s_empty);
+    println!(
+        "Update empty - h: {:?} v: {:?}, s:{:?}",
+        h_empty, v_empty, s_empty
+    );
 }
 
 fn print_matrix(m: &Vec<Vec<char>>) {
@@ -264,29 +270,34 @@ fn print_matrix(m: &Vec<Vec<char>>) {
     }
 }
 
-fn update_memory(
+fn update_board(
     c: char,
     i: usize,
     j: usize,
     board: &mut Vec<Vec<char>>,
     memory: &mut HashMap<(usize, usize), HashSet<char>>,
 ) {
-    println!("upd mem {} {} {}", c, i, j);
-    println!("memory {:?} ", memory);
+    println!("update board {} into {} {}", c, i, j);
+    board[i][j] = c;
+
     for walker in [
         Walker::Hor(WalkHor::from_ij(i, j)),
         Walker::Vert(WalkVert::from_ij(i, j)),
         Walker::Square(WalkSquare::from_ij(i, j)),
     ] {
         for (i, j) in walker {
-            if let Some(pretendents) = memory.get_mut(&(i, j)) {
-                pretendents.remove(&c);
-                println!("|| hey hey len: {}", pretendents.len());
-                if pretendents.len() == 0 {
+            if let Some(mut pretendents) = memory.remove(&(i, j)) {
+                if pretendents.len() > 1 {
+                    println!("Removing {} from {} {} {:?}", c, i, j, pretendents);
+                    pretendents.remove(&c);
+                }
+
+                if pretendents.len() == 1 {
+                    let p = pretendents.iter().next().unwrap();
                     memory.remove(&(i, j));
-                    board[i][j] = c;
-                    println!("board after fix {}", board[i][j]);
-                    update_memory(c, i, j, board, memory);
+                    update_board(*p, i, j, board, memory);
+                } else {
+                    memory.insert((i, j), pretendents);
                 }
             }
         }
