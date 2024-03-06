@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    char::from_digit,
+    collections::{HashMap, HashSet},
+};
 
 macro_rules! min_idx {
     ($vc: ident) => {
@@ -24,6 +27,7 @@ macro_rules! all_zero {
     };
 }
 
+#[derive(Clone, Copy)]
 struct WalkHor {
     hor: usize,
     vert: usize,
@@ -54,6 +58,7 @@ impl Iterator for WalkHor {
     }
 }
 
+#[derive(Clone, Copy)]
 struct WalkVert {
     hor: usize,
     vert: usize,
@@ -84,6 +89,7 @@ impl Iterator for WalkVert {
     }
 }
 
+#[derive(Clone, Copy)]
 struct WalkSquare {
     idx: usize,
     counter: usize,
@@ -118,6 +124,7 @@ impl Iterator for WalkSquare {
     }
 }
 
+#[derive(Clone, Copy)]
 enum Walker {
     Hor(WalkHor),
     Vert(WalkVert),
@@ -137,16 +144,28 @@ impl Iterator for Walker {
 }
 
 fn main() {
+    // let mut sudoku = vec![
+    //     vec!['5', '3', '.', '.', '7', '.', '.', '.', '.'],
+    //     vec!['6', '.', '.', '1', '9', '5', '.', '.', '.'],
+    //     vec!['.', '9', '8', '.', '.', '.', '.', '6', '.'],
+    //     vec!['8', '.', '.', '.', '6', '.', '.', '.', '3'],
+    //     vec!['4', '.', '.', '8', '.', '3', '.', '.', '1'],
+    //     vec!['7', '.', '.', '.', '2', '.', '.', '.', '6'],
+    //     vec!['.', '6', '.', '.', '.', '.', '2', '8', '.'],
+    //     vec!['.', '.', '.', '4', '1', '9', '.', '.', '5'],
+    //     vec!['.', '.', '.', '.', '8', '.', '.', '7', '9'],
+    // ];
+
     let mut sudoku = vec![
-        vec!['5', '3', '.', '.', '7', '.', '.', '.', '.'],
-        vec!['6', '.', '.', '1', '9', '5', '.', '.', '.'],
-        vec!['.', '9', '8', '.', '.', '.', '.', '6', '.'],
-        vec!['8', '.', '.', '.', '6', '.', '.', '.', '3'],
-        vec!['4', '.', '.', '8', '.', '3', '.', '.', '1'],
-        vec!['7', '.', '.', '.', '2', '.', '.', '.', '6'],
-        vec!['.', '6', '.', '.', '.', '.', '2', '8', '.'],
-        vec!['.', '.', '.', '4', '1', '9', '.', '.', '5'],
-        vec!['.', '.', '.', '.', '8', '.', '.', '7', '9'],
+        vec!['.', '.', '9', '7', '4', '8', '.', '.', '.'],
+        vec!['7', '.', '.', '.', '.', '.', '.', '.', '.'],
+        vec!['.', '2', '.', '1', '.', '9', '.', '.', '.'],
+        vec!['.', '.', '7', '.', '.', '.', '2', '4', '.'],
+        vec!['.', '6', '4', '.', '1', '.', '5', '9', '.'],
+        vec!['.', '9', '8', '.', '.', '.', '3', '.', '.'],
+        vec!['.', '.', '.', '8', '.', '3', '.', '2', '.'],
+        vec!['.', '.', '.', '.', '.', '.', '.', '.', '6'],
+        vec!['.', '.', '.', '2', '7', '5', '9', '.', '.'],
     ];
 
     solve_sudoku(&mut sudoku)
@@ -156,6 +175,7 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
     let mut h_empty = [0u8; 9];
     let mut v_empty = [0u8; 9];
     let mut s_empty = [0u8; 9];
+    let mut unfilled: usize = 0;
     let mut memory = HashMap::new();
 
     for i in 0..board.len() {
@@ -164,6 +184,7 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
                 h_empty[i] += 1;
                 v_empty[j] += 1;
                 s_empty[(i / 3) * 3 + j / 3] += 1;
+                unfilled += 1;
             }
         }
     }
@@ -171,7 +192,6 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
     print_matrix(board);
 
     while !all_zero!(h_empty) && !all_zero!(v_empty) && !all_zero!(s_empty) {
-        // for _ in 0..5 {
         let h_fullness = min!(h_empty);
         let v_fullness = min!(v_empty);
         let s_fullness = min!(s_empty);
@@ -204,7 +224,7 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
                 match pretendents.len() {
                     1 => {
                         let p = pretendents.into_iter().next().unwrap();
-                        update_board(p, i, j, board, &mut memory);
+                        update_board(p, i, j, board, &mut memory, &mut unfilled);
                     }
                     _ => {
                         println!("Memory insert {:?}, into {} {}", pretendents, i, j);
@@ -214,9 +234,17 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
                 update_empty(i, j, &mut h_empty, &mut v_empty, &mut s_empty);
             }
         }
+
         print_matrix(board);
         println!("{:?}", memory);
+        println!("unfilled {}", unfilled);
     }
+
+    // Search unique pretendents
+    search_unique(board, &mut memory, &mut unfilled);
+    print_matrix(board);
+    println!("{:?}", memory);
+    println!("unfilled {}", unfilled);
 }
 
 fn get_pretendents(board: &Vec<Vec<char>>, i: usize, j: usize) -> HashSet<char> {
@@ -272,21 +300,24 @@ fn print_matrix(m: &Vec<Vec<char>>) {
 
 fn update_board(
     c: char,
-    i: usize,
-    j: usize,
+    orig_i: usize,
+    orig_j: usize,
     board: &mut Vec<Vec<char>>,
     memory: &mut HashMap<(usize, usize), HashSet<char>>,
+    unfilled: &mut usize,
 ) {
-    println!("update board {} into {} {}", c, i, j);
-    board[i][j] = c;
+    println!("update board {} into {} {}", c, orig_i, orig_j);
+    board[orig_i][orig_j] = c;
+    *unfilled -= 1;
 
     for walker in [
-        Walker::Hor(WalkHor::from_ij(i, j)),
-        Walker::Vert(WalkVert::from_ij(i, j)),
-        Walker::Square(WalkSquare::from_ij(i, j)),
+        Walker::Hor(WalkHor::from_ij(orig_i, orig_j)),
+        Walker::Vert(WalkVert::from_ij(orig_i, orig_j)),
+        Walker::Square(WalkSquare::from_ij(orig_i, orig_j)),
     ] {
         for (i, j) in walker {
             if let Some(mut pretendents) = memory.remove(&(i, j)) {
+                // println!("| <- from memory {} {}", i, j);
                 if pretendents.len() > 1 {
                     println!("Removing {} from {} {} {:?}", c, i, j, pretendents);
                     pretendents.remove(&c);
@@ -294,12 +325,59 @@ fn update_board(
 
                 if pretendents.len() == 1 {
                     let p = pretendents.iter().next().unwrap();
-                    memory.remove(&(i, j));
-                    update_board(*p, i, j, board, memory);
+                    update_board(*p, i, j, board, memory, unfilled);
                 } else {
                     memory.insert((i, j), pretendents);
+                    // println!("| -> to memory {} {}", i, j);
                 }
             }
+        }
+    }
+}
+
+fn search_unique(
+    board: &mut Vec<Vec<char>>,
+    memory: &mut HashMap<(usize, usize), HashSet<char>>,
+    unfilled: &mut usize,
+) {
+    for idx in 0..9 {
+        for walker in [
+            Walker::Hor(WalkHor::new(idx)),
+            Walker::Vert(WalkVert::new(idx)),
+            Walker::Square(WalkSquare::new(idx)),
+        ] {
+            // Count the pretendents
+            // How many times each number presents in pretendents
+            let mut count: [u8; 9] = [0; 9];
+            for (i, j) in walker {
+                if let Some(pretendents) = memory.get(&(i, j)) {
+                    for pretendent in pretendents {
+                        count[*pretendent as usize - 1 - '0' as usize] += 1;
+                    }
+                }
+            }
+            println!("count {:?}", count);
+
+            // Update board with unique pretendents
+            for (idx, cnt) in count.into_iter().enumerate() {
+                if cnt == 1 {
+                    for (i, j) in walker {
+                        if let Some(pretendents) = memory.get(&(i, j)) {
+                            let idx = from_digit(idx as u32 + 1, 10)
+                                .expect("Failed to convert usize to char");
+                            if pretendents.contains(&idx) {
+                                println!(
+                                    "Found unique {} in {} {} | unfilled: {}",
+                                    idx, i, j, unfilled
+                                );
+                                update_board(idx, i, j, board, memory, unfilled)
+                            }
+                        }
+                    }
+                }
+            }
+
+            break;
         }
     }
 }
