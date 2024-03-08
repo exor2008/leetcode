@@ -189,8 +189,6 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
         }
     }
 
-    print_matrix(board);
-
     while !all_zero!(h_empty) && !all_zero!(v_empty) && !all_zero!(s_empty) {
         let h_fullness = min!(h_empty);
         let v_fullness = min!(v_empty);
@@ -201,17 +199,14 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
         let walker = match min_idx!(fullness) {
             0 => {
                 let idx = min_idx!(h_empty);
-                // println!("Walk hor {}", idx);
                 Walker::Hor(WalkHor::new(idx))
             }
             1 => {
                 let idx = min_idx!(v_empty);
-                // println!("Walk vert {}", idx);
                 Walker::Vert(WalkVert::new(idx))
             }
             2 => {
                 let idx = min_idx!(s_empty);
-                // println!("Walk square {}", idx);
                 Walker::Square(WalkSquare::new(idx))
             }
             _ => unreachable!(),
@@ -227,30 +222,20 @@ pub fn solve_sudoku(board: &mut Vec<Vec<char>>) {
                         update_board(p, i, j, board, &mut memory, &mut unfilled, false).unwrap();
                     }
                     _ => {
-                        // println!("Memory insert {:?}, into {} {}", pretendents, i, j);
                         memory.insert((i, j), pretendents);
                     }
                 };
                 update_empty(i, j, &mut h_empty, &mut v_empty, &mut s_empty);
             }
         }
-
-        // print_matrix(board);
-        // println!("{:?}", memory);
-        // println!("unfilled {}", unfilled);
     }
 
     // Search unique pretendents
     search_unique(board, &mut memory, &mut unfilled);
 
     if unfilled > 0 {
-        // println!("Bruteforcing...");
         brute_force(board, &mut memory, &mut unfilled).unwrap();
     }
-
-    print_matrix(board);
-    println!("{:?}", memory);
-    println!("unfilled {}", unfilled);
 }
 
 fn get_pretendents(board: &Vec<Vec<char>>, i: usize, j: usize) -> HashSet<char> {
@@ -291,17 +276,6 @@ fn update_empty(
     h_empty[i] -= 1;
     v_empty[j] -= 1;
     s_empty[(i / 3) * 3 + j / 3] -= 1;
-
-    // println!(
-    //     "Update empty - h: {:?} v: {:?}, s:{:?}",
-    //     h_empty, v_empty, s_empty
-    // );
-}
-
-fn print_matrix(m: &Vec<Vec<char>>) {
-    for v in m.iter() {
-        println!("{:?}", v);
-    }
 }
 
 fn update_board(
@@ -316,7 +290,6 @@ fn update_board(
     if check {
         check_pretendent(&c, orig_i, orig_j, board)?;
     }
-    // println!("update board {} into {} {}", c, orig_i, orig_j);
     board[orig_i][orig_j] = c;
     *unfilled -= 1;
 
@@ -353,7 +326,6 @@ fn search_unique(
                     }
                 }
             }
-            // println!("count {:?}", count);
 
             // Update board with unique pretendents
             for (idx, cnt) in count.into_iter().enumerate() {
@@ -363,10 +335,6 @@ fn search_unique(
                             let idx = from_digit(idx as u32 + 1, 10)
                                 .expect("Failed to convert usize to char");
                             if pretendents.contains(&idx) {
-                                // println!(
-                                //     "Found unique {} in {} {} | unfilled: {}",
-                                //     idx, i, j, unfilled
-                                // );
                                 memory.remove(&(i, j));
                                 update_board(idx, i, j, board, memory, unfilled, false).unwrap()
                             }
@@ -391,7 +359,6 @@ fn remove_pretendent(
 ) -> Result<(), ()> {
     if let Some(mut pretendents) = memory.remove(&(i, j)) {
         if pretendents.len() > 1 {
-            // println!("Removing {} from {} {} {:?}", c, i, j, pretendents);
             pretendents.remove(c);
         }
 
@@ -410,15 +377,12 @@ fn brute_force(
     memory: &mut HashMap<(usize, usize), HashSet<char>>,
     unfilled: &mut usize,
 ) -> Result<(), ()> {
-    println!("||| pizda");
     for (&(i, j), pretendents) in memory
         .clone()
         .iter()
         .filter(|(&(_i, _j), pretendents)| pretendents.len() == 2)
     {
         for pretendent in pretendents.into_iter() {
-            println!("Trying to remove {} from {} {}", pretendent, i, j);
-
             let mut board_variant = board.iter().map(|row| row.clone()).collect();
             let mut memory_variant = HashMap::new();
 
@@ -443,7 +407,6 @@ fn brute_force(
             }
 
             if unfilled_variant > 0 {
-                println!("Continue bruteforcing, unfilled: {}", unfilled_variant);
                 if let Err(()) = brute_force(
                     &mut board_variant,
                     &mut memory_variant,
@@ -452,7 +415,6 @@ fn brute_force(
                     continue;
                 }
             }
-            println!("Bruteforcing finished.");
             board.clone_from(&mut board_variant);
             memory.clone_from(&memory_variant);
             *unfilled = unfilled_variant;
@@ -460,7 +422,6 @@ fn brute_force(
         }
         // Both of two possible pretendents are wrong
         return Err(());
-        // print_matrix(&board);
     }
     Err(())
 }
@@ -478,10 +439,6 @@ fn check_pretendent(
     ] {
         for (i, j) in walker {
             if board[i][j] == *c {
-                // println!(
-                //     "Error {} for {} {} already in {} {}",
-                //     board[i][j], i_orig, j_orig, i, j,
-                // );
                 return Err(());
             }
         }
