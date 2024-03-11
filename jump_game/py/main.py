@@ -21,9 +21,9 @@ class Solution(object):
 
             if num == 1:
                 idx += 1
-                _, num, jump = nums[idx]
+                _, _, jump = nums[idx]
             else:
-                idx, num, jump = max(nums[idx + 1 : jump + 1], key=lambda nj: nj[2])
+                idx, _, jump = max(nums[idx + 1 : jump + 1], key=lambda nj: nj[2])
 
             n_jumps += 1
 

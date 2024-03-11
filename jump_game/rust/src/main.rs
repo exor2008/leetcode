@@ -1,5 +1,5 @@
 fn main() {
-    let c = jump(vec![2, 0, 2, 0, 1]);
+    let c = jump(vec![2, 1, 1, 1, 1]);
     println!("{}", c);
 }
 
@@ -36,7 +36,7 @@ fn jump(nums: Vec<i32>) -> i32 {
                 .max_by_key(|(_idx, _num, jump)| jump)
                 .unwrap();
 
-            (_, _, jump) = *cur;
+            (idx, _, jump) = *cur;
         }
 
         n_jumps += 1;
